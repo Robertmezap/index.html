@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora de Costo Real de Auto Usado en MA</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Warm Neutrals -->
+    <!-- Application Structure Plan: The SPA is designed as an interactive calculator. It replaces the static table with a dynamic tool featuring a price slider. As the user adjusts the slider, a detailed cost breakdown and a donut chart update in real-time. This structure transforms the report from a passive piece of information into a personalized financial planning tool, allowing users to instantly see the impact of hidden costs on their specific budget. This is more engaging and useful than a static display. -->
+    <!-- Visualization & Content Choices: Source data from the user-provided cost table was used to establish the calculation logic. The primary goal is to inform users about the true, "out-the-door" cost. The main visualization is a dynamic donut chart (via Chart.js) that effectively shows the proportion of each cost component (base price, tax, fees). The central interaction is an HTML range slider that allows users to set any vehicle price, triggering instant updates to all displayed values and the chart. This provides immediate, personalized feedback, making the "hidden costs" concept much more tangible and impactful. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #F8F7F4; /* Warm Neutral Background */
+            color: #3C3C3C;
+        }
+        .card {
+            background-color: #FFFFFF;
+            border-radius: 1rem;
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.05), 0 4px 6px -4px rgb(0 0 0 / 0.05);
+            padding: 2rem;
+        }
+        .accent-color {
+            color: #4A5568; /* Muted Blue/Gray */
+        }
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]:focus {
+            outline: none;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 8px;
+            cursor: pointer;
+            background: #E2E8F0;
+            border-radius: 5px;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 24px;
+            width: 24px;
+            border-radius: 50%;
+            background: #4A5568; /* Muted Blue/Gray */
+            cursor: pointer;
+            margin-top: -8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        input[type=range]::-moz-range-track {
+            width: 100%;
+            height: 8px;
+            cursor: pointer;
+            background: #E2E8F0;
+            border-radius: 5px;
+        }
+        input[type=range]::-moz-range-thumb {
+            height: 24px;
+            width: 24px;
+            border-radius: 50%;
+            background: #4A5568;
+            cursor: pointer;
+            border: none;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 450px;
+            height: auto;
+            margin: auto;
+            min-height: 300px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                min-height: 350px;
+            }
+        }
+    </style>
+</head>
+<body class="antialiased">
+    <div class="container mx-auto p-4 md:p-8 max-w-6xl">
+        <header class="text-center mb-10">
+            <h1 class="text-3xl md:text-4xl font-bold accent-color mb-2">Calculadora del Costo Real de un Auto Usado</h1>
+            <p class="text-lg text-gray-600">Descubre el precio final ("Out-the-Door") al comprar un vehículo en Massachusetts.</p>
+        </header>
+
+        <main class="grid grid-cols-1 lg:grid-cols-5 gap-8">
+            
+            <div class="lg:col-span-2 card">
+                <div class="mb-8">
+                    <label for="price-slider" class="block text-lg font-semibold mb-2">Precio del Vehículo:</label>
+                    <div class="flex items-center space-x-4">
+                         <span class="text-2xl font-bold accent-color w-32" id="price-display">$12,500</span>
+                         <input type="range" id="price-slider" min="5000" max="35000" value="12500" step="100" class="flex-1">
+                    </div>
+                    <p class="text-sm text-gray-500 mt-2">Usa el deslizador para ajustar el precio del auto que estás considerando.</p>
+                </div>
+
+                <div>
+                    <h2 class="text-xl font-semibold mb-4 border-b pb-2">Desglose de Costos Adicionales</h2>
+                    <ul class="space-y-3 text-gray-700">
+                        <li class="flex justify-between items-center">
+                            <span>Impuesto a la Venta (6.25%)</span>
+                            <span class="font-medium" id="tax-cost"></span>
+                        </li>
+                        <li class="flex justify-between items-center">
+                            <span>Costo del Título</span>
+                            <span class="font-medium" id="title-cost"></span>
+                        </li>
+                        <li class="flex justify-between items-center">
+                            <span>Costo de Registro</span>
+                            <span class="font-medium" id="reg-cost"></span>
+                        </li>
+                        <li class="flex justify-between items-center">
+                            <span>"Doc Fee" del Dealer (Estimado)</span>
+                            <span class="font-medium" id="doc-fee-cost"></span>
+                        </li>
+                    </ul>
+                    <div class="border-t mt-4 pt-4">
+                        <div class="flex justify-between items-center text-lg font-semibold">
+                            <span>Precio "Out-the-Door"</span>
+                            <span class="accent-color" id="otd-price"></span>
+                        </div>
+                    </div>
+                </div>
+                 <div class="mt-8 border-t pt-6">
+                    <h2 class="text-xl font-semibold mb-4">Costos Iniciales Adicionales</h2>
+                    <p class="text-sm text-gray-600 mb-4">Recuerda que también necesitarás tener este dinero disponible el día de la compra.</p>
+                     <ul class="space-y-3 text-gray-700">
+                        <li class="flex justify-between items-center">
+                            <span>Primer Mes de Seguro (Estimado)</span>
+                            <span class="font-medium" id="insurance-cost"></span>
+                        </li>
+                        <li class="flex justify-between items-center">
+                            <span>Inspección Vehicular</span>
+                            <span class="font-medium" id="inspection-cost"></span>
+                        </li>
+                    </ul>
+                     <div class="bg-yellow-50 border border-yellow-200 p-4 rounded-lg mt-6">
+                        <div class="flex justify-between items-center text-xl font-bold">
+                            <span>TOTAL DESEMBOLSO INICIAL</span>
+                            <span class="accent-color" id="total-outlay"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="lg:col-span-3 card flex flex-col justify-center items-center">
+                <h2 class="text-xl font-semibold mb-4 text-center">Composición del Costo Total</h2>
+                <div class="chart-container">
+                    <canvas id="cost-chart"></canvas>
+                </div>
+                <p class="text-sm text-gray-500 mt-4 text-center">Este gráfico muestra qué porcentaje del costo total corresponde al precio del auto y a los gastos adicionales.</p>
+            </div>
+        </main>
+
+        <footer class="text-center mt-12 text-sm text-gray-500">
+            <p>Esta calculadora provee una estimación y no constituye una cotización formal. Los "Doc Fees" varían por concesionario.</p>
+        </footer>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const priceSlider = document.getElementById('price-slider');
+            const priceDisplay = document.getElementById('price-display');
+            
+            const taxCostEl = document.getElementById('tax-cost');
+            const titleCostEl = document.getElementById('title-cost');
+            const regCostEl = document.getElementById('reg-cost');
+            const docFeeCostEl = document.getElementById('doc-fee-cost');
+            const otdPriceEl = document.getElementById('otd-price');
+            const insuranceCostEl = document.getElementById('insurance-cost');
+            const inspectionCostEl = document.getElementById('inspection-cost');
+            const totalOutlayEl = document.getElementById('total-outlay');
+            const chartCanvas = document.getElementById('cost-chart');
+
+            const fixedCosts = {
+                salesTaxRate: 0.0625,
+                titleFee: 75.00,
+                regFee: 60.00,
+                docFee: 500.00,
+                insurance: 400.00,
+                inspection: 35.00
+            };
+
+            const formatCurrency = (value) => {
+                return new Intl.NumberFormat('es-US', {
+                    style: 'currency',
+                    currency: 'USD',
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 0,
+                }).format(value);
+            };
+
+            let costChart;
+
+            function updateCalculations() {
+                const vehiclePrice = parseFloat(priceSlider.value);
+
+                const salesTax = vehiclePrice * fixedCosts.salesTaxRate;
+                const otdPrice = vehiclePrice + salesTax + fixedCosts.titleFee + fixedCosts.regFee + fixedCosts.docFee;
+                const totalOutlay = otdPrice + fixedCosts.insurance + fixedCosts.inspection;
+
+                priceDisplay.textContent = formatCurrency(vehiclePrice);
+                taxCostEl.textContent = formatCurrency(salesTax);
+                titleCostEl.textContent = formatCurrency(fixedCosts.titleFee);
+                regCostEl.textContent = formatCurrency(fixedCosts.regFee);
+                docFeeCostEl.textContent = formatCurrency(fixedCosts.docFee);
+                otdPriceEl.textContent = formatCurrency(otdPrice);
+                insuranceCostEl.textContent = formatCurrency(fixedCosts.insurance);
+                inspectionCostEl.textContent = formatCurrency(fixedCosts.inspection);
+                totalOutlayEl.textContent = formatCurrency(totalOutlay);
+
+                updateChart(vehiclePrice, salesTax, fixedCosts.titleFee, fixedCosts.regFee, fixedCosts.docFee, fixedCosts.insurance, fixedCosts.inspection);
+            }
+            
+            function updateChart(vehiclePrice, tax, title, reg, doc, insurance, inspection) {
+                const chartData = {
+                    labels: [
+                        'Precio del Vehículo',
+                        'Impuestos y Tarifas',
+                        'Costos Iniciales'
+                    ],
+                    datasets: [{
+                        label: 'Desglose del Costo Total',
+                        data: [
+                            vehiclePrice, 
+                            tax + title + reg + doc,
+                            insurance + inspection
+                        ],
+                        backgroundColor: [
+                            '#4A5568', // Muted Blue/Gray
+                            '#A0AEC0', // Lighter Gray
+                            '#FBBF24'  // Amber Accent
+                        ],
+                        borderColor: '#FFFFFF',
+                        borderWidth: 3,
+                        hoverOffset: 4
+                    }]
+                };
+
+                if (costChart) {
+                    costChart.data.datasets[0].data = chartData.datasets[0].data;
+                    costChart.update();
+                } else {
+                    costChart = new Chart(chartCanvas, {
+                        type: 'doughnut',
+                        data: chartData,
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    position: 'bottom',
+                                    labels: {
+                                        font: {
+                                            size: 14,
+                                            family: "'Inter', sans-serif"
+                                        },
+                                        padding: 20
+                                    }
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            let label = context.label || '';
+                                            if (label) {
+                                                label += ': ';
+                                            }
+                                            if (context.parsed !== null) {
+                                                label += formatCurrency(context.parsed);
+                                            }
+                                            return label;
+                                        }
+                                    },
+                                    bodyFont: {
+                                        size: 14,
+                                        family: "'Inter', sans-serif"
+                                    },
+                                    titleFont: {
+                                        size: 16,
+                                        family: "'Inter', sans-serif"
+                                    }
+                                }
+                            },
+                            cutout: '60%'
+                        }
+                    });
+                }
+            }
+
+            priceSlider.addEventListener('input', updateCalculations);
+            updateCalculations();
+        });
+    </script>
+</body>
+</html>
